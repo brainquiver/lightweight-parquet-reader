@@ -17,6 +17,8 @@
 #define FIXTURE "test/fixtures/shapes.parquet"
 #define FIXTURE_V2 "test/fixtures/shapes-v2.parquet"
 #define ROWS 4000U
+#define GROUPS 4U
+#define GROUP_ROWS 1000U
 
 /* The fixture, read whole. The caller frees it. */
 static uint8_t *slurp(const char *p_path, size_t *p_len)
@@ -55,6 +57,13 @@ static bool read_column(parquet_file_t *p_file, const char *p_name,
     return parquet_read_strings(p_file, p_name, 0U, p_out, ROWS, p_count);
 }
 
+/* Reads one row group of a column into caller memory. */
+static bool read_group(parquet_file_t *p_file, const char *p_name,
+                       size_t group, parquet_string_t *p_out, size_t *p_count)
+{
+    return parquet_read_strings(p_file, p_name, group, p_out, ROWS, p_count);
+}
+
 /* True when this value holds exactly this text. */
 static bool holds(const parquet_string_t *p_value, const char *p_want)
 {
@@ -78,6 +87,11 @@ static void the_fixture_opens_and_says_what_it_holds(void)
     }
 
     CHECK_EQUAL(parquet_rows(p_file), ROWS, "it holds four thousand rows");
+    CHECK_EQUAL(parquet_row_groups(p_file), GROUPS, "in four row groups");
+    CHECK_EQUAL(parquet_row_group_rows(p_file, 0U), GROUP_ROWS,
+                "of a thousand rows each");
+    CHECK_EQUAL(parquet_row_group_rows(p_file, GROUPS), 0U,
+                "and a group past the end holds zero rows");
     CHECK_TRUE(parquet_has_column(p_file, "plain_pages"), "and its columns");
     CHECK_TRUE(parquet_has_column(p_file, "dict_pages"), "by name");
     CHECK_TRUE(parquet_has_column(p_file, "nulls"), "each of them");
@@ -123,7 +137,7 @@ static void a_value_of_an_early_page_survives_the_later_pages(void)
 
     CHECK_TRUE(read_column(p_file, "plain_pages", p_values, &count),
                "the plain column reads");
-    CHECK_EQUAL(count, ROWS, "and gives every row");
+    CHECK_EQUAL(count, GROUP_ROWS, "and gives every row of the group");
 
     /* Row zero, tested when every page of the chunk is already decoded. */
     CHECK_TRUE(holds(&p_values[0], "row 0 abcdefghij"),
@@ -173,7 +187,7 @@ static void a_dictionary_column_gives_the_value_and_not_the_index(void)
 
     CHECK_TRUE(read_column(p_file, "dict_pages", p_values, &count),
                "the dictionary column reads");
-    CHECK_EQUAL(count, ROWS, "and gives every row");
+    CHECK_EQUAL(count, GROUP_ROWS, "and gives every row of the group");
 
     for (i = 0U; i < count; i++)
     {
@@ -213,7 +227,7 @@ static void a_null_is_not_an_empty_value(void)
 
     CHECK_TRUE(read_column(p_file, "nulls", p_values, &count),
                "the optional column reads");
-    CHECK_EQUAL(count, ROWS, "and a null still takes its row");
+    CHECK_EQUAL(count, GROUP_ROWS, "and a null still takes its row");
 
     for (i = 0U; i < count; i++)
     {
@@ -224,7 +238,8 @@ static void a_null_is_not_an_empty_value(void)
     }
 
     CHECK_TRUE(b_right, "and the nulls fall where the writer put them");
-    CHECK_EQUAL(nulls, (ROWS + 6U) / 7U, "which is every seventh row");
+    CHECK_EQUAL(nulls, (GROUP_ROWS + 6U) / 7U,
+                "which is every seventh row");
 
     /* An empty value is present: its pointer is set and its length is 0. */
     CHECK_TRUE(read_column(p_file, "empties", p_values, &count),
@@ -271,7 +286,7 @@ static void a_version_two_page_reads_the_same_values(void)
 
     CHECK_TRUE(read_column(p_file, "plain_pages", p_values, &count),
                "a version two plain column reads");
-    CHECK_EQUAL(count, ROWS, "and gives every row");
+    CHECK_EQUAL(count, GROUP_ROWS, "and gives every row of the group");
     CHECK_TRUE(holds(&p_values[0], "row 0 abcdefghij"),
                "and its first value survives the pages after it");
 
@@ -300,7 +315,82 @@ static void a_version_two_page_reads_the_same_values(void)
     }
 
     CHECK_TRUE(b_right, "and its levels put the nulls where the writer did");
-    CHECK_EQUAL(nulls, (ROWS + 6U) / 7U, "which is every seventh row");
+    CHECK_EQUAL(nulls, (GROUP_ROWS + 6U) / 7U,
+                "which is every seventh row");
+
+    free(p_values);
+    parquet_close(p_file);
+    free(p_bytes);
+}
+
+/*
+ * Every row group reads, and each gives its own rows.
+ *
+ * A column is read one row group at a time. A reader that keeps state across
+ * groups, for example a dictionary or an arena offset, gives the second group
+ * the first group's answers. Row 0 of group 1 is row 1000 of the file.
+ */
+static void each_row_group_gives_its_own_rows(void)
+{
+    size_t len = 0U;
+    uint8_t *p_bytes = slurp(FIXTURE, &len);
+    parquet_file_t *p_file = (NULL == p_bytes) ? NULL
+                                               : parquet_open(p_bytes, len);
+    parquet_string_t *p_values = malloc(ROWS * sizeof(parquet_string_t));
+    size_t group = 0U;
+    size_t count = 0U;
+    bool b_same = true;
+
+    if ((NULL == p_file) || (NULL == p_values))
+    {
+        CHECK_TRUE(false, "the fixture opens");
+        free(p_values);
+        free(p_bytes);
+        return;
+    }
+
+    for (group = 0U; group < GROUPS; group++)
+    {
+        size_t i = 0U;
+
+        b_same = b_same &&
+                 read_group(p_file, "plain_pages", group, p_values, &count) &&
+                 (GROUP_ROWS == count);
+
+        for (i = 0U; (i < count) && b_same; i++)
+        {
+            char p_want[256];
+            size_t row = (group * GROUP_ROWS) + i;
+            size_t repeats = (row % 17U) + 1U;
+            size_t k = 0U;
+            int at = snprintf(p_want, sizeof(p_want), "row %zu ", row);
+
+            for (k = 0U; k < repeats; k++)
+            {
+                at += snprintf(&p_want[at], sizeof(p_want) - (size_t)at,
+                               "abcdefghij");
+            }
+
+            b_same = b_same && holds(&p_values[i], p_want);
+        }
+    }
+
+    CHECK_TRUE(b_same, "every row group gives the rows that belong to it");
+
+    /* And a dictionary column, which has one dictionary for each chunk. */
+    b_same = read_group(p_file, "dict_pages", GROUPS - 1U, p_values, &count);
+    CHECK_TRUE(b_same, "the last row group of a dictionary column reads");
+
+    if (b_same)
+    {
+        char p_want[32];
+
+        size_t row = (size_t)(GROUPS - 1U) * (size_t)GROUP_ROWS;
+
+        (void)snprintf(p_want, sizeof(p_want), "class %zu", row % 12U);
+        CHECK_TRUE(holds(&p_values[0], p_want),
+                   "and its first row is the text that row holds");
+    }
 
     free(p_values);
     parquet_close(p_file);
@@ -354,6 +444,7 @@ void suite_parquet(void)
     a_dictionary_column_gives_the_value_and_not_the_index();
     a_null_is_not_an_empty_value();
     a_version_two_page_reads_the_same_values();
+    each_row_group_gives_its_own_rows();
     a_file_that_is_not_parquet_is_refused();
     a_column_that_is_not_a_string_is_refused();
 

@@ -28,10 +28,18 @@
  *
  * Ownership of the bytes.
  *
- * A value points into memory that the reader owns, and the next call for the
- * same row group replaces it. A caller that needs a value to outlive that call
- * copies it. The reader itself never copies a value, because the files that it
- * targets are together larger than memory and it exists to walk them.
+ * A value points into memory that the reader owns, and the next call to
+ * parquet_read_strings replaces it. A call for a different column or a
+ * different row group reuses the same memory. A caller that needs a value to
+ * outlive that call copies it.
+ *
+ * The reader itself never copies a value, because the files that it targets
+ * are together larger than memory and it exists to walk them.
+ *
+ * The narrower promise, that only a call for the same row group replaces a
+ * value, is the obvious assumption, and it is false. If a caller reads one
+ * column, then another, and then uses the first column's values, those values
+ * hold real text from the second column.
  */
 #ifndef PARQUET_H
 #define PARQUET_H

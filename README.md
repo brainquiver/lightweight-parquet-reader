@@ -60,7 +60,7 @@ Both need `pyarrow` installed. They are test tools, separate from the library.
 
 ## 4. Rules
 
-**Copy any value that is needed after the next read of the same row group.** Every call for the same row group reuses the same memory, so the next call overwrites the values from the last one.
+**Copy any value that is needed after the next read.** Every call to `parquet_read_strings` reuses the same memory, so the next call overwrites the values from the last one.
 
 **Allocate a chunk's whole buffer before reading its pages.** Values point into the decompressed pages, so the buffer must not move while a chunk is read. The size comes from `total_uncompressed_size` in the footer, and the test `a_value_of_an_early_page_survives_the_later_pages` checks this.
 
@@ -99,8 +99,8 @@ Measured on 2026-08-27 over 1,554 parquet files, with the build from section 1.
 | Encodings | PLAIN, RLE, RLE_DICTIONARY |
 | Footers compared with pyarrow, field for field | 122, all equal |
 | String columns compared with pyarrow, byte for byte | 29 files, all equal |
-| Library source | 2,395 lines |
+| Library source | 2,403 lines |
 | Leaks, under `leaks --atExit` | 0, over the suite and a full read of the measured files |
 | Undefined behaviour, under `-fsanitize=undefined` | 0 reports |
-| Unit checks | 89, over three suites |
+| Unit checks | 95, over three suites |
 | Dependency | libzstd, 0.6 MB |

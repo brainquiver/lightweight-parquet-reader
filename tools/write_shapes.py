@@ -12,6 +12,9 @@ The shapes here are the ones that broke a reader.
     empties       zero length values, which a reader must keep distinct from
                   nulls.
 
+Each file holds four row groups. A column is read one row group at a time, so a
+reader that keeps any state across groups reads the second group wrong.
+
 A second file holds the same shapes as version two data pages. In these pages
 the levels sit outside the compressed part, and the levels do not carry a
 length prefix. The files that this reader targets do not use these pages
@@ -55,6 +58,7 @@ def main():
         use_dictionary=["dict_pages"],
         write_statistics=False,
         version="1.0",
+        row_group_size=1000,
     )
     pq.write_table(
         table, OUT_V2,
@@ -64,6 +68,7 @@ def main():
         use_dictionary=["dict_pages"],
         write_statistics=False,
         version="2.6",
+        row_group_size=1000,
     )
 
     for path in (OUT, OUT_V2):

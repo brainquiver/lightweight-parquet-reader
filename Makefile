@@ -26,6 +26,9 @@ TEST_DEP = $(SRC)
 all: $(BUILD)/run-tests $(BUILD)/dump-meta $(BUILD)/dump-strings \
       $(BUILD)/peek-strings
 
+# The directory is an order-only prerequisite, so its own timestamp never
+# forces a relink. Without the bar, every target rebuilds on every run, and a
+# stale binary then hides behind a build that appears to succeed.
 $(BUILD):
 	mkdir -p $(BUILD)
 
