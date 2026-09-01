@@ -10,6 +10,9 @@ generated:
 supervised:
   by: human:ciprian-florin_ifrim
   at: 2026-08-27T10:20:00Z
+edited:
+  by: claude-code/opus-5
+  at: 2026-09-01T11:23:44Z
 ---
 
 # Lightweight Parquet Reader
@@ -31,11 +34,14 @@ Apache Arrow reads every part of the format, but it depends on thirteen other li
 
 ## 1. Build and Run
 
-    make                                   # the library, the tests and the tools
+    make                                   # the archive, the tests and the tools
     make test                              # the unit suites
+    make build/liblparquet.a               # the archive alone
     build/dump-meta FILE.parquet           # the footer, one line per field and chunk
     build/dump-strings FILE.parquet text   # a digest of one column, per row group
     build/peek-strings FILE.parquet text 5 # the first values of a column, to check by eye
+
+Other programs link `build/liblparquet.a` together with `libzstd`, as in `-llparquet -lzstd`. The tools in `tools/` compile the sources directly and do not need the archive.
 
 Two scripts check the reader against pyarrow, field by field and byte by byte:
 
@@ -47,6 +53,7 @@ Both need `pyarrow` installed. They are test tools, separate from the library.
 ## 2. Directory Tree
 
     src/        the library, with one header for each source file
+    build/      liblparquet.a, the tools and the test binary
     test/       the unit suites, the harness and the committed fixtures
     tools/      the pyarrow comparison scripts and the fixture generator
 

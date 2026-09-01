@@ -23,8 +23,8 @@ TEST_DEP = $(SRC)
 
 .DEFAULT_GOAL := all
 
-all: $(BUILD)/run-tests $(BUILD)/dump-meta $(BUILD)/dump-strings \
-      $(BUILD)/peek-strings
+all: $(BUILD)/liblparquet.a $(BUILD)/run-tests $(BUILD)/dump-meta \
+      $(BUILD)/dump-strings $(BUILD)/peek-strings
 
 # The directory is an order-only prerequisite, so its own timestamp never
 # forces a relink. Without the bar, every target rebuilds on every run, and a
@@ -35,6 +35,16 @@ $(BUILD):
 $(BUILD)/run-tests: $(TEST_SRC) $(TEST_DEP) $(HDR) test/check.h test/suites.h \
                     | $(BUILD)
 	$(CC) $(CFLAGS) -Itest -o $@ $(TEST_SRC) $(TEST_DEP) $(LDFLAGS) $(LDLIBS)
+
+# Another program links this archive. That program supplies main(), and it
+# links libzstd beside the archive, because a parquet page is compressed.
+OBJ = $(SRC:src/%.c=$(BUILD)/%.o)
+
+$(BUILD)/%.o: src/%.c $(HDR) | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/liblparquet.a: $(OBJ)
+	ar rcs $@ $(OBJ)
 
 $(BUILD)/dump-meta: tools/dump_meta.c $(SRC) $(HDR) | $(BUILD)
 	$(CC) $(CFLAGS) -o $@ tools/dump_meta.c $(SRC) $(LDFLAGS) $(LDLIBS)
