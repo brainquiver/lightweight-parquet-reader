@@ -1,18 +1,18 @@
 ---
 type: Repository Guide
 title: Lightweight Parquet Reader
-description: Reads the string columns of a parquet file in C99, with libzstd as its only dependency.
-status: draft
+description: C99 reader for Parquet string columns, with libzstd as its only dependency.
+status: stable
 tags: [parquet, host, c]
 generated:
   by: claude-code/opus-5
   at: 2026-08-27T10:20:00Z
 supervised:
   by: human:ciprian-florin_ifrim
-  at: 2026-08-27T10:20:00Z
+  at: 2026-10-02T17:54:03Z
 edited:
   by: claude-code/opus-5
-  at: 2026-09-01T11:23:44Z
+  at: 2026-10-02T17:54:03Z
 ---
 
 # Lightweight Parquet Reader
