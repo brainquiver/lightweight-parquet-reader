@@ -108,6 +108,6 @@ Measured on 2026-08-27 over 1,554 parquet files, with the build from section 1.
 | String columns compared with pyarrow, byte for byte | 29 files, all equal |
 | Library source | 2,403 lines |
 | Leaks, under `leaks --atExit` | 0, over the suite and a full read of the measured files |
-| Undefined behaviour, under `-fsanitize=undefined` | 0 reports |
+| Undefined behavior, under `-fsanitize=undefined` | 0 reports |
 | Unit checks | 95, over three suites |
 | Dependency | libzstd, 0.6 MB |
