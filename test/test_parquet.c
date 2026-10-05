@@ -247,7 +247,7 @@ static void a_null_is_not_an_empty_value(void)
     CHECK_TRUE(NULL != p_values[0].p_bytes,
                "an empty value is present");
     CHECK_EQUAL(p_values[0].len, 0U, "and its length is zero");
-    CHECK_TRUE(holds(&p_values[1], "e1"), "and its neighbours are unaffected");
+    CHECK_TRUE(holds(&p_values[1], "e1"), "and its neighbors are unaffected");
 
     free(p_values);
     parquet_close(p_file);
